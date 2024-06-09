@@ -14,97 +14,53 @@ seoul_tz = pytz.timezone("Asia/Seoul")
 # .env 파일 로드
 load_dotenv()
 
-# AWS 자격 증명 환경 변수 설정
-aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-region = os.getenv("AWS_REGION")
 user_table_name = os.getenv("USER_TABLE")
 match_table_name = os.getenv("MATCH_TABLE")
 bedrock_lambda_url = os.getenv("BEDROCK_LAMBDA_URL")
 dynamo_lambda_url = os.getenv("DYNAMO_LAMBDA_URL")
-
-
-def get_dynamodb_resource():
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region = os.getenv("AWS_REGION")
-    return boto3.resource(
-        "dynamodb",
-        region_name=region,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
-
-
-# DynamoDB 테이블 설정
-def get_tables():
-    dynamodb = get_dynamodb_resource()
-    user_table = dynamodb.Table(user_table_name)
-    match_table = dynamodb.Table(match_table_name)
-    return user_table, match_table
+max_user_id = os.getenv("GET_MAX_USER_ID")
+name_check = os.getenv("IS_NAME_EXIST")
+create_user = os.getenv("ADD_USER")
+today_match = os.getenv("TODAY_MATCH")
+top_users = os.getenv("TOP_USERS")
+head_to_head = os.getenv("HEAD_TO_HEAD")
+user_info = os.getenv("USER_INFO")
+user_matches = os.getenv("USER_MATCHES")
 
 
 # 현재 최대 user_id 가져오기
 def get_max_user_id():
-    user_table, _ = get_tables()
-    response = user_table.scan()
-    items = response["Items"]
-    if not items:
-        return 0
-    max_user_id = max(int(item["user_id"]) for item in items)
-    return max_user_id
+    response = requests.get(max_user_id)
+    return response.json()["max_user_id"]  # Number
 
 
 # 사용자 이름 중복 여부 확인 함수
 def is_name_exist(name):
-    user_table, _ = get_tables()
-    response = user_table.scan(FilterExpression=Key("name").eq(name))
-    items = response["Items"]
-    return len(items) > 0
+    response = requests.post(name_check, json={"name": name})
+    return response.json()["is_name_exist"]  # True or False
 
 
 # 사용자 추가 함수
 def add_user(name, password):
-    try:
-        user_table, _ = get_tables()
-        max_user_id = get_max_user_id()
-        new_user_id = max_user_id + 1
-        user_table.put_item(
-            Item={
-                "user_id": new_user_id,  # 숫자 타입으로 설정
-                "name": name,
-                "password": int(password),  # 숫자 타입으로 설정
-                "win": 0,  # 숫자 타입으로 설정
-                "lose": 0,  # 숫자 타입으로 설정
-                "point": 0,  # 숫자 타입으로 설정
-                "daily_limit": 3,  # 숫자 타입으로 설정
-                "rank": "비기너",
-                "type": 1,
-            }
-        )
-        return True
-    except Exception as e:
-        print(f"Error adding user: {e}")
-        return False
+    max_user_id = get_max_user_id()
+    response = requests.post(
+        create_user,
+        json={"max_user_id": max_user_id, "name": name, "password": password},
+    )
+    return response.json()  # True or False
 
 
 # 오늘의 경기 정보 가져오기
 def get_today_matches(place):
-    _, match_table = get_tables()
     today = datetime.now(pytz.timezone("Asia/Seoul")).date().isoformat()
-    response = match_table.scan(
-        FilterExpression=Key("place").eq(place) & Key("match_date").begins_with(today)
-    )
-    return response["Items"]
+    response = requests.post(today_match, json={"today": today, "place": place})
+    return response.json()  # 리스트에 들어가 있는 객체 형태의 매치 정보
 
 
 # 포인트 상위 10위 사용자 가져오기
 def get_top_users():
-    user_table, _ = get_tables()
-    response = user_table.scan()
-    users = response["Items"]
-    top_users = sorted(users, key=lambda x: x["point"], reverse=True)[:10]
-    return top_users
+    response = requests.get(top_users)
+    return response.json()  # 객체 안에 있는 유저 정보
 
 
 # 대기열 사용자 가져오기
@@ -120,14 +76,10 @@ def get_queue_users(place):
 
 # 상대 전적 가져오기
 def get_head_to_head(player1, player2):
-    _, match_table = get_tables()
-    response = match_table.scan(
-        FilterExpression=(
-            Key("player1_name").eq(player1) & Key("player2_name").eq(player2)
-        )
-        | (Key("player1_name").eq(player2) & Key("player2_name").eq(player1))
+    response = requests.post(
+        head_to_head, json={"player1": player1, "player2": player2}
     )
-    matches = response["Items"]
+    matches = response.json()
     player1_wins = sum(1 for match in matches if match["winner"] == player1)
     player2_wins = sum(1 for match in matches if match["winner"] == player2)
     return player1_wins, player2_wins
@@ -135,28 +87,20 @@ def get_head_to_head(player1, player2):
 
 # 사용자 정보 가져오기 함수
 def get_user_info_from_dynamo(name, password):
-    user_table, _ = get_tables()
-    response = user_table.scan(
-        FilterExpression=Key("name").eq(name) & Key("password").eq(int(password))
-    )
-    items = response["Items"]
+    response = requests.post(user_info, json={"name": name, "password": password})
+    items = response.json()
     return items[0] if items else None
 
 
 # 사용자 경기 기록 가져오기 함수
 def get_user_matches_from_dynamo(name):
-    _, match_table = get_tables()
-    response = match_table.scan(
-        FilterExpression=Key("player1_name").eq(name) | Key("player2_name").eq(name)
-    )
-    items = response["Items"]
+    response = requests.post(user_matches, json={"name": name})
+    items = response.json()
     return items
 
 
 def get_streaming_response(prompt, user_info, user_matches):
     s = requests.Session()
-    print("넘어오는 내용확인")
-    print(prompt)
 
     # user_info와 user_matches 데이터를 텍스트로 변환
     user_info_text = f"User Info: 이름: {user_info['name']}, 포인트: {user_info['point']}, 승리: {user_info['win']}, 패배: {user_info['lose']}, 랭크: {user_info['rank']}"
