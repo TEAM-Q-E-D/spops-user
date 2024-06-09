@@ -4,7 +4,6 @@ import streamlit as st
 st.set_page_config(
     page_title="업데이트 안내",
     layout="centered",
-    initial_sidebar_state="collapsed",
 )
 
 # 헤더

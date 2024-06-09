@@ -20,21 +20,33 @@ aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
 region = os.getenv("AWS_REGION")
 user_table_name = os.getenv("USER_TABLE")
 match_table_name = os.getenv("MATCH_TABLE")
-lambda_url = os.getenv("BEDROCK_LAMBDA_URL")
+bedrock_lambda_url = os.getenv("BEDROCK_LAMBDA_URL")
+dynamo_lambda_url = os.getenv("DYNAMO_LAMBDA_URL")
 
-# DynamoDB 연결 설정
-dynamodb = boto3.resource(
-    "dynamodb",
-    region_name=region,
-    aws_access_key_id=aws_access_key_id,
-    aws_secret_access_key=aws_secret_access_key,
-)
-user_table = dynamodb.Table(user_table_name)
-match_table = dynamodb.Table(match_table_name)
+
+def get_dynamodb_resource():
+    aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    region = os.getenv("AWS_REGION")
+    return boto3.resource(
+        "dynamodb",
+        region_name=region,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+
+
+# DynamoDB 테이블 설정
+def get_tables():
+    dynamodb = get_dynamodb_resource()
+    user_table = dynamodb.Table(user_table_name)
+    match_table = dynamodb.Table(match_table_name)
+    return user_table, match_table
 
 
 # 현재 최대 user_id 가져오기
 def get_max_user_id():
+    user_table, _ = get_tables()
     response = user_table.scan()
     items = response["Items"]
     if not items:
@@ -45,6 +57,7 @@ def get_max_user_id():
 
 # 사용자 이름 중복 여부 확인 함수
 def is_name_exist(name):
+    user_table, _ = get_tables()
     response = user_table.scan(FilterExpression=Key("name").eq(name))
     items = response["Items"]
     return len(items) > 0
@@ -53,6 +66,7 @@ def is_name_exist(name):
 # 사용자 추가 함수
 def add_user(name, password):
     try:
+        user_table, _ = get_tables()
         max_user_id = get_max_user_id()
         new_user_id = max_user_id + 1
         user_table.put_item(
@@ -76,6 +90,7 @@ def add_user(name, password):
 
 # 오늘의 경기 정보 가져오기
 def get_today_matches(place):
+    _, match_table = get_tables()
     today = datetime.now(pytz.timezone("Asia/Seoul")).date().isoformat()
     response = match_table.scan(
         FilterExpression=Key("place").eq(place) & Key("match_date").begins_with(today)
@@ -85,6 +100,7 @@ def get_today_matches(place):
 
 # 포인트 상위 10위 사용자 가져오기
 def get_top_users():
+    user_table, _ = get_tables()
     response = user_table.scan()
     users = response["Items"]
     top_users = sorted(users, key=lambda x: x["point"], reverse=True)[:10]
@@ -104,6 +120,7 @@ def get_queue_users(place):
 
 # 상대 전적 가져오기
 def get_head_to_head(player1, player2):
+    _, match_table = get_tables()
     response = match_table.scan(
         FilterExpression=(
             Key("player1_name").eq(player1) & Key("player2_name").eq(player2)
@@ -118,6 +135,7 @@ def get_head_to_head(player1, player2):
 
 # 사용자 정보 가져오기 함수
 def get_user_info_from_dynamo(name, password):
+    user_table, _ = get_tables()
     response = user_table.scan(
         FilterExpression=Key("name").eq(name) & Key("password").eq(int(password))
     )
@@ -127,6 +145,7 @@ def get_user_info_from_dynamo(name, password):
 
 # 사용자 경기 기록 가져오기 함수
 def get_user_matches_from_dynamo(name):
+    _, match_table = get_tables()
     response = match_table.scan(
         FilterExpression=Key("player1_name").eq(name) | Key("player2_name").eq(name)
     )
@@ -153,7 +172,9 @@ def get_streaming_response(prompt, user_info, user_matches):
     # 모든 데이터를 하나의 문자열로 합침
     prompt_with_data = f"{user_info_text}\n{user_matches_text}\nPrompt: {prompt}"
 
-    response = s.post(lambda_url, json={"prompt": prompt_with_data}, stream=True)
+    response = s.post(
+        bedrock_lambda_url, json={"prompt": prompt_with_data}, stream=True
+    )
 
     output = ""
     for chunk in response.iter_lines():
