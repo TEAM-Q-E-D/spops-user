@@ -60,51 +60,56 @@ if st.session_state.user_checked:
         col4, col5, col6 = st.columns(3)
         col4.metric("승률", f"{win_rate:.2f}%")
 
-        # 가장 많이 이긴 사람과 가장 많이 진 사람 계산
-        match_df = pd.DataFrame(st.session_state.user_matches)
+        user_matches = st.session_state.user_matches
+        if user_matches:
+            match_df = pd.DataFrame(user_matches)
 
-        # 승패여부 계산
-        match_df["result"] = match_df.apply(
-            lambda row: (
-                "승리"
-                if (
-                    (
-                        row["player1_name"] == user_info["name"]
-                        and row["player1_score"] > row["player2_score"]
-                    )
-                    or (
-                        row["player2_name"] == user_info["name"]
-                        and row["player2_score"] > row["player1_score"]
-                    )
+            # 승패여부 계산
+            if not match_df.empty:
+                match_df["result"] = match_df.apply(
+                    lambda row: (
+                        "승리"
+                        if (
+                            (
+                                row["player1_name"] == user_info["name"]
+                                and row["player1_score"] > row["player2_score"]
+                            )
+                            or (
+                                row["player2_name"] == user_info["name"]
+                                and row["player2_score"] > row["player1_score"]
+                            )
+                        )
+                        else "패배"
+                    ),
+                    axis=1,
                 )
-                else "패배"
-            ),
-            axis=1,
-        )
 
-        match_df["opponent"] = match_df.apply(
-            lambda row: (
-                row["player2_name"]
-                if row["player1_name"] == user_info["name"]
-                else row["player1_name"]
-            ),
-            axis=1,
-        )
-        win_df = match_df[match_df["result"] == "승리"]
-        lose_df = match_df[match_df["result"] == "패배"]
+                match_df["opponent"] = match_df.apply(
+                    lambda row: (
+                        row["player2_name"]
+                        if row["player1_name"] == user_info["name"]
+                        else row["player1_name"]
+                    ),
+                    axis=1,
+                )
+                win_df = match_df[match_df["result"] == "승리"]
+                lose_df = match_df[match_df["result"] == "패배"]
 
-        if not win_df.empty:
-            most_wins_against = win_df["opponent"].value_counts().idxmax()
-        else:
-            most_wins_against = "없음"
+                if not win_df.empty:
+                    most_wins_against = win_df["opponent"].value_counts().idxmax()
+                else:
+                    most_wins_against = "없음"
 
-        if not lose_df.empty:
-            most_losses_against = lose_df["opponent"].value_counts().idxmax()
-        else:
-            most_losses_against = "없음"
+                if not lose_df.empty:
+                    most_losses_against = lose_df["opponent"].value_counts().idxmax()
+                else:
+                    most_losses_against = "없음"
+            else:
+                most_wins_against = "없음"
+                most_losses_against = "없음"
 
-        col5.metric("가장 많이 이긴 사람", f"🍚 {most_wins_against}")
-        col6.metric("가장 많이 진 사람", f"👿 {most_losses_against}")
+            col5.metric("가장 많이 이긴 사람", f"🍚 {most_wins_against}")
+            col6.metric("가장 많이 진 사람", f"👿 {most_losses_against}")
 
     with tab2:
         st.header("경기 기록", divider="rainbow")
@@ -112,82 +117,85 @@ if st.session_state.user_checked:
         if user_matches:
             match_df = pd.DataFrame(user_matches)
 
-            # 날짜 형식 변환
-            match_df["match_date"] = pd.to_datetime(
-                match_df["match_date"]
-            ).dt.tz_convert(seoul_tz)
-            match_df["match_date"] = match_df["match_date"].dt.strftime(
-                "%m월 %d일 %H시 %M분"
-            )
+            if not match_df.empty:
+                # 날짜 형식 변환
+                match_df["match_date"] = pd.to_datetime(
+                    match_df["match_date"]
+                ).dt.tz_convert(seoul_tz)
+                match_df["match_date"] = match_df["match_date"].dt.strftime(
+                    "%m월 %d일 %H시 %M분"
+                )
 
-            # 사용자 이름 제거 및 필요한 컬럼만 선택
-            match_df["상대 이름"] = match_df.apply(
-                lambda row: (
-                    row["player2_name"]
-                    if row["player1_name"] == user_info["name"]
-                    else row["player1_name"]
-                ),
-                axis=1,
-            )
-            match_df["내 점수"] = match_df.apply(
-                lambda row: (
-                    row["player1_score"]
-                    if row["player1_name"] == user_info["name"]
-                    else row["player2_score"]
-                ),
-                axis=1,
-            )
-            match_df["상대 점수"] = match_df.apply(
-                lambda row: (
-                    row["player2_score"]
-                    if row["player1_name"] == user_info["name"]
-                    else row["player1_score"]
-                ),
-                axis=1,
-            )
-            match_df["내 점수"] = match_df["내 점수"].astype(int)
-            match_df["상대 점수"] = match_df["상대 점수"].astype(int)
+                # 사용자 이름 제거 및 필요한 컬럼만 선택
+                match_df["상대 이름"] = match_df.apply(
+                    lambda row: (
+                        row["player2_name"]
+                        if row["player1_name"] == user_info["name"]
+                        else row["player1_name"]
+                    ),
+                    axis=1,
+                )
+                match_df["내 점수"] = match_df.apply(
+                    lambda row: (
+                        row["player1_score"]
+                        if row["player1_name"] == user_info["name"]
+                        else row["player2_score"]
+                    ),
+                    axis=1,
+                )
+                match_df["상대 점수"] = match_df.apply(
+                    lambda row: (
+                        row["player2_score"]
+                        if row["player1_name"] == user_info["name"]
+                        else row["player1_score"]
+                    ),
+                    axis=1,
+                )
+                match_df["내 점수"] = match_df["내 점수"].astype(int)
+                match_df["상대 점수"] = match_df["상대 점수"].astype(int)
 
-            # 승패여부 계산
-            match_df["결과"] = match_df.apply(
-                lambda row: (
-                    "승리"
-                    if (
-                        (
-                            row["player1_name"] == user_info["name"]
-                            and row["player1_score"] > row["player2_score"]
+                # 승패여부 계산
+                match_df["결과"] = match_df.apply(
+                    lambda row: (
+                        "승리"
+                        if (
+                            (
+                                row["player1_name"] == user_info["name"]
+                                and row["player1_score"] > row["player2_score"]
+                            )
+                            or (
+                                row["player2_name"] == user_info["name"]
+                                and row["player2_score"] > row["player1_score"]
+                            )
                         )
-                        or (
-                            row["player2_name"] == user_info["name"]
-                            and row["player2_score"] > row["player1_score"]
-                        )
-                    )
-                    else "패배"
-                ),
-                axis=1,
-            )
+                        else "패배"
+                    ),
+                    axis=1,
+                )
 
-            match_df = match_df[
-                [
-                    "match_date",
+                match_df = match_df[
+                    [
+                        "match_date",
+                        "상대 이름",
+                        "내 점수",
+                        "상대 점수",
+                        "결과",
+                        "match_type",
+                    ]
+                ]
+
+                match_df.columns = [
+                    "경기 날짜",
                     "상대 이름",
                     "내 점수",
                     "상대 점수",
                     "결과",
-                    "match_type",
+                    "모드",
                 ]
-            ]
 
-            match_df.columns = [
-                "경기 날짜",
-                "상대 이름",
-                "내 점수",
-                "상대 점수",
-                "결과",
-                "모드",
-            ]
-
-            st.table(match_df)
+                st.table(match_df)
+            else:
+                st.write("경기 기록이 없습니다.")
         else:
             st.write("경기 기록이 없습니다.")
 
