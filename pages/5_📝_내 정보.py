@@ -12,7 +12,7 @@ import pytz
 seoul_tz = pytz.timezone("Asia/Seoul")
 
 # Streamlit 앱 시작
-st.title("내 정보 확인👤")
+st.title("데이터 분석실 🔍")
 st.divider()
 
 # 사용자 입력 필드
