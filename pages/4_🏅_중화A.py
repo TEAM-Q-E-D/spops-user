@@ -109,7 +109,7 @@ with tab1:
     )
     col6.metric(
         "오늘 무패",
-        f"💯 {', '.join(undefeated_players) if undefeated_players else '없음'}",
+        f"💯 {' '.join(undefeated_players) if undefeated_players else '없음'}",
     )
 
 

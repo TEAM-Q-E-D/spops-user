@@ -33,6 +33,8 @@ if submit_button:
         st.error("사용자 이름으로 '빈자리'를 사용할 수 없습니다.")
     elif len(password) != 4 or not password.isdigit():
         st.error("비밀번호는 숫자 4자리여야 합니다.")
+    elif password.startswith("0"):
+        st.error("비밀번호는 '0'으로 시작할 수 없습니다.")
     elif is_name_exist(name):
         st.error("이미 존재하는 이름입니다. 다른 이름을 입력하세요.")
     else:

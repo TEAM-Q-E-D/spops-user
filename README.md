@@ -17,3 +17,6 @@ sudo systemctl enable nginx
 sudo cp nginx.conf /etc/nginx/nginx.conf
 
 sudo service nginx restart
+
+
+pip install --upgrade jinja2
