@@ -20,7 +20,7 @@ aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
 region = os.getenv("AWS_REGION")
 user_table_name = os.getenv("USER_TABLE")
 match_table_name = os.getenv("MATCH_TABLE")
-lambda_url = os.getenv("LAMBDA_URL")
+lambda_url = os.getenv("BEDROCK_LAMBDA_URL")
 
 # DynamoDB 연결 설정
 dynamodb = boto3.resource(
