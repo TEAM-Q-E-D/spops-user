@@ -2,7 +2,6 @@ import pytz
 import pandas as pd
 import os
 import json
-import boto3
 from boto3.dynamodb.conditions import Key
 from dotenv import load_dotenv
 from datetime import datetime
@@ -52,7 +51,11 @@ def add_user(name, password):
 
 # 오늘의 경기 정보 가져오기
 def get_today_matches(place):
-    today = datetime.now(pytz.timezone("Asia/Seoul")).date().isoformat()
+    # today = datetime.now(pytz.timezone("Asia/Seoul")).date().isoformat()
+    today = datetime.now(pytz.timezone("UTC")).date().isoformat()
+    print("여기엔뭔데")
+    print(today)
+    print(place)
     response = requests.post(today_match, json={"today": today, "place": place})
     return response.json()  # 리스트에 들어가 있는 객체 형태의 매치 정보
 
@@ -114,7 +117,7 @@ def get_streaming_response(prompt, user_info, user_matches):
         user_matches_text += f"{match_date} - {match['player1_name']} {match['player1_score']} vs {match['player2_score']} {match['player2_name']} ({match['match_type']})\n"
 
     # 모든 데이터를 하나의 문자열로 합침
-    prompt_with_data = f"{user_info_text}\n{user_matches_text}\nPrompt: {prompt}"
+    prompt_with_data = f"system: 반드시!!!!경기 정보와 관련 없는 질문은 대답하지 않고 경기 분석 질문을 유도해야한다.\n{user_info_text}\n{user_matches_text}\nPrompt: {prompt}"
 
     response = s.post(
         bedrock_lambda_url, json={"prompt": prompt_with_data}, stream=True

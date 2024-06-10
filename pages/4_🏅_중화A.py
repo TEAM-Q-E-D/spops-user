@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 from dynamo_utils import get_queue_users, get_today_matches, get_head_to_head
 import altair as alt
 import pytz
@@ -54,8 +53,12 @@ total_players = len(
 
 # 오늘의 최다 승자 계산
 winners = [match["winner"] for match in today_matches]
-most_wins = pd.Series(winners).value_counts().idxmax()
-most_wins_count = pd.Series(winners).value_counts().max()
+if winners:
+    most_wins = pd.Series(winners).value_counts().idxmax()
+    most_wins_count = pd.Series(winners).value_counts().max()
+else:
+    most_wins = "없음"
+    most_wins_count = 0
 
 
 # 최대 점수차 계산
@@ -64,8 +67,11 @@ def calculate_point_diff(row):
 
 
 today_match_df = pd.DataFrame(today_matches)
-today_match_df["point_diff"] = today_match_df.apply(calculate_point_diff, axis=1)
-max_point_diff_match = today_match_df.loc[today_match_df["point_diff"].idxmax()]
+if not today_match_df.empty:
+    today_match_df["point_diff"] = today_match_df.apply(calculate_point_diff, axis=1)
+    max_point_diff_match = today_match_df.loc[today_match_df["point_diff"].idxmax()]
+else:
+    max_point_diff_match = {"player1_score": 0, "player2_score": 0}
 
 # 0점 맞은 사람 계산
 zero_score_players = []
@@ -76,14 +82,17 @@ for index, row in today_match_df.iterrows():
         zero_score_players.append(row["player2_name"])
 
 # 오늘 무패 계산
-player_wins = pd.Series(winners).value_counts()
-player_matches = pd.Series(
-    [match["player1_name"] for match in today_matches]
-    + [match["player2_name"] for match in today_matches]
-).value_counts()
-undefeated_players = [
-    player for player, wins in player_wins.items() if wins == player_matches[player]
-]
+if winners:
+    player_wins = pd.Series(winners).value_counts()
+    player_matches = pd.Series(
+        [match["player1_name"] for match in today_matches]
+        + [match["player2_name"] for match in today_matches]
+    ).value_counts()
+    undefeated_players = [
+        player for player, wins in player_wins.items() if wins == player_matches[player]
+    ]
+else:
+    undefeated_players = []
 
 # 탭 생성
 tab1, tab2, tab3 = st.tabs(["🏅 오늘의 경기 정보", "📊 경기 목록", "📈 경기 수 그래프"])
@@ -112,57 +121,59 @@ with tab1:
         f"💯 {' '.join(undefeated_players) if undefeated_players else '없음'}",
     )
 
-
 with tab2:
     st.header("오늘의 :blue[경기 목록]", divider="rainbow")
     st.code("다들 수고 많으셨습니다! 오늘의 경기 결과입니다. 🎉")
-    # 최신 경기 정보가 가장 위에 오도록 정렬
-    today_match_df = today_match_df.sort_values(by="match_date", ascending=False)
-    # 매치 타입 변환
-    today_match_df["match_type"] = today_match_df["match_type"].replace(
-        {"normal": "일반", "deathmatch": "데스매치"}
-    )
-
-    # 승자와 패자를 구분하여 데이터 변환
-    def transform_match_data(row):
-        if row["player1_score"] > row["player2_score"]:
-            winner = row["player1_name"]
-            winner_score = row["player1_score"]
-            loser = row["player2_name"]
-            loser_score = row["player2_score"]
-        else:
-            winner = row["player2_name"]
-            winner_score = row["player2_score"]
-            loser = row["player1_name"]
-            loser_score = row["player1_score"]
-        return pd.Series(
-            [
-                winner,
-                winner_score,
-                loser_score,
-                loser,
-                row["match_type"],
-                row["match_date"],
-            ]
+    if not today_match_df.empty:
+        # 최신 경기 정보가 가장 위에 오도록 정렬
+        today_match_df = today_match_df.sort_values(by="match_date", ascending=False)
+        # 매치 타입 변환
+        today_match_df["match_type"] = today_match_df["match_type"].replace(
+            {"normal": "일반", "deathmatch": "데스매치"}
         )
 
-    transformed_df = today_match_df.apply(transform_match_data, axis=1)
-    transformed_df.columns = [
-        "승자",
-        "승자 점수",
-        "패자 점수",
-        "패자",
-        "모드",
-        "match_date",
-    ]
-    transformed_df = transformed_df.sort_values(by="match_date", ascending=False).drop(
-        columns=["match_date"]
-    )
-    # 테이블 표시 (가운데 정렬)
-    styled_table = transformed_df.style.hide(axis="index").set_table_styles(
-        [{"selector": "td", "props": [("text-align", "center")]}]
-    )
-    st.table(styled_table)
+        # 승자와 패자를 구분하여 데이터 변환
+        def transform_match_data(row):
+            if row["player1_score"] > row["player2_score"]:
+                winner = row["player1_name"]
+                winner_score = row["player1_score"]
+                loser = row["player2_name"]
+                loser_score = row["player2_score"]
+            else:
+                winner = row["player2_name"]
+                winner_score = row["player2_score"]
+                loser = row["player1_name"]
+                loser_score = row["player1_score"]
+            return pd.Series(
+                [
+                    winner,
+                    winner_score,
+                    loser_score,
+                    loser,
+                    row["match_type"],
+                    row["match_date"],
+                ]
+            )
+
+        transformed_df = today_match_df.apply(transform_match_data, axis=1)
+        transformed_df.columns = [
+            "승자",
+            "승자 점수",
+            "패자 점수",
+            "패자",
+            "모드",
+            "match_date",
+        ]
+        transformed_df = transformed_df.sort_values(
+            by="match_date", ascending=False
+        ).drop(columns=["match_date"])
+        # 테이블 표시 (가운데 정렬)
+        styled_table = transformed_df.style.hide(axis="index").set_table_styles(
+            [{"selector": "td", "props": [("text-align", "center")]}]
+        )
+        st.table(styled_table)
+    else:
+        st.write("오늘의 경기 목록이 없습니다.")
 
 with tab3:
     st.header("오늘의 :blue[경기 수 그래프]", divider="rainbow")
@@ -199,3 +210,5 @@ with tab3:
             .properties(width=700, height=400, title="시간대 별 경기 수")
         )
         st.altair_chart(chart)
+    else:
+        st.write("오늘의 경기 수 그래프를 표시할 데이터가 없습니다.")
