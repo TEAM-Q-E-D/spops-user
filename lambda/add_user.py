@@ -26,6 +26,7 @@ def lambda_handler(event, context):
                 "lose": 0,  # 숫자 타입으로 설정
                 "point": 0,  # 숫자 타입으로 설정
                 "daily_limit": 3,  # 숫자 타입으로 설정
+                "death_match_limit": 2,
                 "rank": "비기너",
                 "type": 1,
             }
